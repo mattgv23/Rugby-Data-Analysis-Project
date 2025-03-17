@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 def results_calculator(matches_df): 
     #Find the unique values of the scoreboard
@@ -127,7 +129,10 @@ def jersey_to_license(matches_df):
     #The columns to associate in a dictionary shall be those that contain 'xx_jersey' and 'xx_license'
 
     #Not downcasting since this shall be removed in future versions
-    pd.set_option('future.no_silent_downcasting', True)
+    try:
+        pd.set_option('future.no_silent_downcasting', True)
+    except:
+        pass
 
     #Loop to run per match (row)
     for j in range(len(matches_df)):
@@ -173,7 +178,7 @@ def jersey_to_license(matches_df):
         local_replace_columns = local_columns.replace(local_team_jersey_to_license)
         visitor_replace_columns = visitor_columns.replace(visitor_team_jersey_to_license)
 
-        #Asiggn replaces values to corresponding columns in the original dataframe
+        #Assign replaces values to corresponding columns in the original dataframe
         matches_df.loc[j, local_replace_columns.index] = local_replace_columns
         matches_df.loc[j, visitor_replace_columns.index] = visitor_replace_columns
 
@@ -242,3 +247,130 @@ def create_team_df (matches_df, team):
     team_df.sort_values(['date', 'match_time'], inplace=True)
     
     return team_df
+
+#General points histograms in time
+def points_to_histogram(team_df, team_to_study):
+    #Create a figure
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5), sharey=True)
+
+    team_score_minutes_list = []
+    rival_score_minutes_list = []
+
+    #Run through every column
+    for i in range(1, 27):
+
+        #Get the tries minutes for team
+        team_score_minutes_series = team_df[team_df[f'scoreboard_{i:02d}_type'].notna()][f'scoreboard_{i:02d}_minute']
+        team_score_minutes_list = team_score_minutes_list + team_score_minutes_series.tolist()
+
+        try:
+            #Get the tries minutes for rival
+            rival_score_minutes_series = team_df[team_df[f'scoreboard_rival_{i:02d}_type'].notna()][f'scoreboard_rival_{i:02d}_minute']
+            rival_score_minutes_list = rival_score_minutes_list + rival_score_minutes_series.tolist()
+
+        except KeyError:
+            pass
+
+    #Create a histogram for the points made by the team
+    sns.histplot(x=team_score_minutes_list, bins=range(0, 90, 10), ax=ax[0])
+    sns.histplot(x=rival_score_minutes_list, bins=range(0, 90, 10), color='orange', ax=ax[1])
+
+    ax[0].set_title(f'{team_to_study}scoring actions in favour')
+    ax[1].set_title(f'{team_to_study}scoring actions against')
+
+    plt.show()
+
+    return 
+
+#Tries and penalties in time
+def tries_to_histogram(team_df, team_to_study):
+
+    for action in ['E', 'PC']:
+
+        #Create a figure
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5), sharey=True)
+
+        team_tries_minutes_list = []
+        rival_tries_minutes_list = []
+
+        #Run through every column
+        for i in range(1, 27):
+
+            #Get the tries minutes for team
+            team_tries_minutes_series = team_df[team_df[f'scoreboard_{i:02d}_type'] == action][f'scoreboard_{i:02d}_minute']
+            team_tries_minutes_list = team_tries_minutes_list + team_tries_minutes_series.tolist()
+
+            try:
+                #Get the tries minutes for rival
+                rival_tries_minutes_series = team_df[team_df[f'scoreboard_rival_{i:02d}_type'] == action][f'scoreboard_rival_{i:02d}_minute']
+                rival_tries_minutes_list = rival_tries_minutes_list + rival_tries_minutes_series.tolist()
+
+            except KeyError:
+                pass
+
+        #team_df[team_df[y_axis_columns] == 'E']['scoreboard_01_type'].head()
+        sns.histplot(x=team_tries_minutes_list, bins=range(0,90,10), ax=ax[0])
+        sns.histplot(x=rival_tries_minutes_list, bins=range(0,90,10), color='orange', ax=ax[1])
+
+        if action == 'E':
+            ax[0].set_title(f'{team_to_study}tries in favour')
+            ax[1].set_title(f'{team_to_study}tries against')
+        elif action == 'PC':
+            ax[0].set_title(f'{team_to_study}penalties in favour')
+            ax[1].set_title(f'{team_to_study}panlties against')
+        
+
+        plt.show()
+
+    return 
+
+def season_scoreboard(team_df):
+
+    team_df['rival_scoreboard_points(-)'] = team_df['rival_scoreboard_points'] * -1
+
+    plt.figure(figsize=(15, 6))
+    ax = sns.barplot(x='date', y='scoreboard_points', data=team_df, errorbar=None)
+    ax = sns.barplot(x='date', y='rival_scoreboard_points(-)', data=team_df, color='orange', errorbar=None)
+
+    # Agregar los valores encima de cada columna
+    for p in ax.patches:
+        ax.annotate(
+            f'{abs(int(p.get_height()))}',  # Texto a mostrar (el valor de la barra)
+            (p.get_x() + p.get_width() / 2., p.get_height()),  # Posición (x, y)
+            ha='center',  # Alineación horizontal
+            va='center',  # Alineación vertical
+            xytext=(0, 10),  # Desplazamiento del texto (x, y)
+            textcoords='offset points'  # Tipo de coordenadas para el desplazamiento
+        )
+
+    plt.xticks(ticks=range(len(team_df)), labels=team_df['rival_team'], rotation=90)
+    plt.xlabel('Equipo rival')
+    plt.ylabel('Puntos')
+    plt.title('Puntos a favor y en contra por partido')
+    plt.axhline(0, color='black', linewidth=0.8)  # Línea horizontal en y=0
+
+    plt.show()
+
+    return 
+
+#Tactical substitutions histograms in time
+def subs_to_histogram(team_df, n_matches):
+    #Create 
+    team_subs_minutes_list = []
+
+    #Run through every column. Every match permits up to 8 substituions per team
+    for i in range(1, 9):
+
+        try:
+            #Get the tries minutes for rival
+            subs_minutes_series = team_df[team_df[f'substitutions_{i:02d}_type'] == 'CT' ][f'substitutions_{i:02d}_minute'][-n_matches:]
+            team_subs_minutes_list = team_subs_minutes_list + subs_minutes_series.tolist()
+
+        except KeyError:
+            pass
+
+    #Create a histogram for the points made by the team
+    sns.histplot(x=team_subs_minutes_list, bins=range(0, 90, 10))
+    plt.show()
+
+    return 
